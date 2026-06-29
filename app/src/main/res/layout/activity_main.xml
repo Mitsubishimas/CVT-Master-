@@ -29,25 +29,25 @@
                 android:layout_height="wrap_content"
                 android:text="Не подключено"
                 android:textColor="@color/error"
-                android:textSize="12sp"
-                android:layout_marginEnd="8dp"/>
+                android:textSize="11sp"
+                android:layout_marginEnd="6dp"/>
             
             <Button
                 android:id="@+id/btn_connect"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="34dp"
                 android:text="Подключить"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:layout_marginEnd="4dp"/>
             
             <Button
                 android:id="@+id/btn_menu"
                 style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
                 android:text="☰"
-                android:textSize="18sp"/>
+                android:textSize="16sp"/>
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
     

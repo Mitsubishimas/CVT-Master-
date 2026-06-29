@@ -114,22 +114,20 @@ class MainActivity : AppCompatActivity() {
             "🔄 Проверить обновления",
             "📁 Экспорт логов (CSV)",
             "📊 Состояние подключения",
-            "⚙️ Настройки протокола",
             "🛢️ Сброс деградации масла",
-            "🔍 Сканировать ошибки",
+            "📦 Разрешить установку APK",
             if (useAutoProtocol) "☐ Режим: Авто (ATSP0)" else "☑ Режим: Mitsubishi (ATSP6)"
         )
         AlertDialog.Builder(this)
-            .setTitle("Меню CVT Master")
+            .setTitle("☰ Меню")
             .setItems(items) { _, which ->
                 when (which) {
                     0 -> checkForUpdates()
                     1 -> exportData()
                     2 -> showConnectionInfo()
-                    3 -> showProtocolSettings()
-                    4 -> resetOilDegradation()
-                    5 -> scanDTC()
-                    6 -> toggleProtocol()
+                    3 -> resetOilDegradation()
+                    4 -> requestInstallPermission()
+                    5 -> { useAutoProtocol = !useAutoProtocol; Toast.makeText(this, "Протокол: ${if (useAutoProtocol) "Авто" else "ATSP6"}\nПереподключитесь!", Toast.LENGTH_SHORT).show() }
                 }
             }
             .show()
@@ -143,94 +141,6 @@ class MainActivity : AppCompatActivity() {
                    "TCM: 0x$TCM_REQUEST -> 0x$TCM_RESPONSE\n" +
                    "Записей в логе: ${dataLogger.getEntryCount()}"
         AlertDialog.Builder(this).setTitle("Состояние").setMessage(info).setPositiveButton("OK", null).show()
-    }
-
-    private fun showProtocolSettings() {
-        val items = arrayOf("ATSP6 - Mitsubishi (рекомендуется)", "ATSP0 - Автоопределение")
-        AlertDialog.Builder(this)
-            .setTitle("Выберите протокол")
-            .setSingleChoiceItems(items, if (useAutoProtocol) 1 else 0) { _, which ->
-                useAutoProtocol = (which == 1)
-                Toast.makeText(this, "Протокол: ${if (useAutoProtocol) "Авто" else "ATSP6"}\nПереподключитесь для применения", Toast.LENGTH_SHORT).show()
-            }
-            .setPositiveButton("OK", null)
-            .show()
-    }
-
-    private fun toggleProtocol() {
-        useAutoProtocol = !useAutoProtocol
-        Toast.makeText(this, "Протокол: ${if (useAutoProtocol) "Авто (ATSP0)" else "Mitsubishi (ATSP6)"}\nПереподключитесь!", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun getTempStatus(temp: Float): Triple<String, Int, String> {
-        return when {
-            temp <= 0 -> Triple("Нет данных", Color.GRAY, "")
-            temp < 70 -> Triple("Холодный", Color.CYAN, "Прогрев вариатора")
-            temp in 70.0..74.9 -> Triple("Прогрев", Color.rgb(0,200,200), "Выход на рабочую температуру")
-            temp in 75.0..97.9 -> Triple("Рабочая температура", Color.rgb(0,255,0), "Оптимальный режим")
-            temp in 98.0..105.9 -> Triple("Горячий", Color.rgb(255,165,0), "Повышенная нагрузка")
-            else -> Triple("ПЕРЕГРЕВ!", Color.RED, "Остановитесь и дайте остыть!")
-        }
-    }
-
-    private fun requestAllPermissions() {
-        val permissions = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)
-                permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED)
-                permissions.add(Manifest.permission.BLUETOOTH_SCAN)
-        } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED)
-                permissions.add(Manifest.permission.BLUETOOTH)
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!packageManager.canRequestPackageInstalls()) {
-                permissions.add(Manifest.permission.REQUEST_INSTALL_PACKAGES)
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Settings.canDrawOverlays(this)) {
-                permissions.add(Manifest.permission.SYSTEM_ALERT_WINDOW)
-            }
-        }
-        if (permissions.isNotEmpty()) ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST)
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-            checkBluetoothEnabled()
-            requestInstallPermission()
-        }
-    }
-
-    private fun requestInstallPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
-            AlertDialog.Builder(this)
-                .setTitle("Установка обновлений")
-                .setMessage("Для автоматической установки обновлений разрешите установку из неизвестных источников")
-                .setPositiveButton("Разрешить") { _, _ ->
-                    startActivityForResult(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply { data = Uri.parse("package:$packageName") }, REQUEST_INSTALL)
-                }
-                .setNegativeButton("Позже", null)
-                .show()
-        }
-    }
-
-    private fun checkBluetoothEnabled() {
-        val btAdapter = BluetoothAdapter.getDefaultAdapter()
-        if (btAdapter != null && !btAdapter.isEnabled) startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BT)
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            REQUEST_ENABLE_BT -> Toast.makeText(this, if (resultCode == RESULT_OK) "Bluetooth включен" else "Bluetooth не включен", Toast.LENGTH_SHORT).show()
-            REQUEST_INSTALL -> Toast.makeText(this, if (packageManager.canRequestPackageInstalls()) "Установка разрешена" else "Установка не разрешена", Toast.LENGTH_SHORT).show()
-        }
     }
 
     private fun setupNavigation() {
@@ -256,15 +166,91 @@ class MainActivity : AppCompatActivity() {
                     graphView = CVTGraphView(this)
                     contentContainer.addView(graphView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
                 }
-                R.id.nav_dtc -> contentContainer.addView(TextView(this).apply { text = "Ошибки отображаются через Меню"; setTextColor(getColor(R.color.white)); textSize = 16f; setPadding(32, 32, 32, 32) })
-                R.id.nav_service -> contentContainer.addView(TextView(this).apply { text = "Сервисные функции в Меню"; setTextColor(getColor(R.color.white)); textSize = 16f; setPadding(32, 32, 32, 32) })
-                R.id.nav_logs -> {
+                R.id.nav_dtc -> {
                     val l = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 32, 32, 32) }
-                    l.addView(TextView(this).apply { text = "Записей: " + dataLogger.getEntryCount(); setTextColor(getColor(R.color.white)) })
+                    l.addView(Button(this).apply { text = "🔍 Сканировать ошибки"; setOnClickListener { scanDTC() } })
+                    l.addView(TextView(this).apply { text = "\nОшибки отображаются во всплывающем окне"; setTextColor(0xFF888888.toInt()); textSize = 13f })
+                    contentContainer.addView(l)
+                }
+                R.id.nav_settings -> {
+                    val l = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 32, 32, 32) }
+                    
+                    l.addView(TextView(this).apply { text = "⚙️ Настройки"; setTextColor(getColor(R.color.white)); textSize = 20f; setPadding(0, 0, 0, 24) })
+                    
+                    // Протокол
+                    l.addView(TextView(this).apply { text = "Протокол CAN:"; setTextColor(getColor(R.color.white)); textSize = 14f })
+                    val rg = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
+                    val rb1 = RadioButton(this).apply { text = "ATSP6 - Mitsubishi (рекомендуется)"; setTextColor(getColor(R.color.white)); isChecked = !useAutoProtocol }
+                    val rb2 = RadioButton(this).apply { text = "ATSP0 - Автоопределение"; setTextColor(getColor(R.color.white)); isChecked = useAutoProtocol }
+                    rg.addView(rb1); rg.addView(rb2)
+                    rg.setOnCheckedChangeListener { _, id -> useAutoProtocol = (id == rb2.id) }
+                    l.addView(rg)
+                    
+                    l.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 24) })
+                    
+                    // Кнопки
+                    l.addView(Button(this).apply { text = "🔄 Проверить обновления"; setOnClickListener { checkForUpdates() } })
+                    l.addView(Button(this).apply { text = "📁 Экспорт логов (CSV)"; setOnClickListener { exportData() } })
+                    l.addView(Button(this).apply { text = "🛢️ Сброс деградации масла"; setOnClickListener { resetOilDegradation() } })
+                    l.addView(Button(this).apply { text = "📊 Состояние подключения"; setOnClickListener { showConnectionInfo() } })
+                    l.addView(Button(this).apply { text = "📦 Разрешить установку APK"; setOnClickListener { requestInstallPermission() } })
+                    l.addView(Button(this).apply { text = "🔄 Переподключить ECU"; setOnClickListener { if (bluetoothManager.connectionState.value == ConnectionState.READY) initELM327ForCar() else Toast.makeText(this@MainActivity, "Сначала подключитесь", Toast.LENGTH_SHORT).show() } })
+                    
                     contentContainer.addView(l)
                 }
             }
             true
+        }
+    }
+
+    private fun getTempStatus(temp: Float): Triple<String, Int, String> {
+        return when {
+            temp <= 0 -> Triple("Нет данных", Color.GRAY, "")
+            temp < 70 -> Triple("Холодный", Color.CYAN, "Прогрев вариатора")
+            temp in 70.0..74.9 -> Triple("Прогрев", Color.rgb(0,200,200), "Выход на рабочую температуру")
+            temp in 75.0..97.9 -> Triple("Рабочая температура", Color.rgb(0,255,0), "Оптимальный режим")
+            temp in 98.0..105.9 -> Triple("Горячий", Color.rgb(255,165,0), "Повышенная нагрузка")
+            else -> Triple("ПЕРЕГРЕВ!", Color.RED, "Остановитесь и дайте остыть!")
+        }
+    }
+
+    private fun requestAllPermissions() {
+        val permissions = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.BLUETOOTH_SCAN)
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.BLUETOOTH)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (permissions.isNotEmpty()) ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) checkBluetoothEnabled()
+    }
+
+    private fun requestInstallPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            AlertDialog.Builder(this)
+                .setTitle("Установка обновлений")
+                .setMessage("Для установки обновлений разрешите установку из неизвестных источников")
+                .setPositiveButton("Разрешить") { _, _ -> startActivityForResult(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply { data = Uri.parse("package:$packageName") }, REQUEST_INSTALL) }
+                .setNegativeButton("Отмена", null).show()
+        } else { Toast.makeText(this, "Установка уже разрешена", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun checkBluetoothEnabled() {
+        val btAdapter = BluetoothAdapter.getDefaultAdapter()
+        if (btAdapter != null && !btAdapter.isEnabled) startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BT)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            REQUEST_ENABLE_BT -> Toast.makeText(this, if (resultCode == RESULT_OK) "Bluetooth включен" else "Bluetooth не включен", Toast.LENGTH_SHORT).show()
+            REQUEST_INSTALL -> Toast.makeText(this, if (packageManager.canRequestPackageInstalls()) "Установка разрешена" else "Не разрешено", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -293,17 +279,15 @@ class MainActivity : AppCompatActivity() {
                 bluetoothManager.sendRawCommand("ATL0"); delay(100)
                 bluetoothManager.sendRawCommand("ATS1"); delay(100)
                 bluetoothManager.sendRawCommand("ATH1"); delay(200)
-                if (useAutoProtocol) { bluetoothManager.sendRawCommand("ATSP0"); delay(2000) }
-                else { bluetoothManager.sendRawCommand("ATSP6"); delay(500) }
+                if (useAutoProtocol) { bluetoothManager.sendRawCommand("ATSP0"); delay(2000) } else { bluetoothManager.sendRawCommand("ATSP6"); delay(500) }
                 val elmVersion = bluetoothManager.sendRawCommand("ATI"); delay(200)
-                val protocol = bluetoothManager.sendRawCommand("ATDPN"); delay(200)
                 bluetoothManager.sendRawCommand("ATSH $TCM_REQUEST"); delay(100)
                 bluetoothManager.sendRawCommand("ATCRA $TCM_RESPONSE"); delay(100)
                 bluetoothManager.sendRawCommand("ATCF $TCM_RESPONSE"); delay(100)
                 val testResp = bluetoothManager.sendRawCommand("01 00"); delay(300)
                 runOnUiThread {
                     tvConnectionStatus.text = "Подключено"
-                    tvCvtInfo.text = "ELM: $elmVersion\nПротокол: $protocol\nРежим: ${if (useAutoProtocol) "Авто" else "ATSP6"}\nTCM: 0x$TCM_REQUEST->0x$TCM_RESPONSE\nТест: ${if (testResp.contains("41")) "OK" else "Нет ответа"}"
+                    tvCvtInfo.text = "ELM: $elmVersion | TCM: 0x$TCM_REQUEST->0x$TCM_RESPONSE | Тест: ${if (testResp.contains("41")) "OK" else "Нет ответа"}"
                 }
                 startDataCollection()
             } catch (e: Exception) { runOnUiThread { tvCvtInfo.text = "Ошибка: ${e.message}" } }
@@ -314,9 +298,7 @@ class MainActivity : AppCompatActivity() {
         val btAdapter = BluetoothAdapter.getDefaultAdapter()
         if (btAdapter == null) { Toast.makeText(this, "Bluetooth не поддерживается", Toast.LENGTH_LONG).show(); return }
         if (!btAdapter.isEnabled) { startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BT); return }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Нет разрешения", Toast.LENGTH_SHORT).show(); requestAllPermissions(); return
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) { Toast.makeText(this, "Нет разрешения", Toast.LENGTH_SHORT).show(); requestAllPermissions(); return }
         val devices = bluetoothManager.getPairedDevices()
         if (devices.isEmpty()) { Toast.makeText(this, "Нет сопряженных устройств", Toast.LENGTH_LONG).show(); return }
         if (devices.size == 1) bluetoothManager.connectToDevice(devices[0].address)
@@ -363,13 +345,7 @@ class MainActivity : AppCompatActivity() {
     private fun exportData() {
         lifecycleScope.launch {
             val f = dataLogger.exportToCSV()
-            runOnUiThread {
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Экспорт логов")
-                    .setMessage(if (f != null) "Сохранено:\n${f.absolutePath}" else "Ошибка сохранения")
-                    .setPositiveButton("OK", null)
-                    .show()
-            }
+            runOnUiThread { AlertDialog.Builder(this@MainActivity).setTitle("Экспорт").setMessage(if (f != null) "Сохранено:\n${f.absolutePath}" else "Ошибка").setPositiveButton("OK", null).show() }
         }
     }
 
@@ -384,13 +360,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 val tag = json.split("\"tag_name\":\"")[1].split("\"")[0]; val url = json.split("\"browser_download_url\":\"")[1].split("\"")[0]
                 runOnUiThread {
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle("Обновление $tag")
-                        .setMessage("Доступна новая версия.\nСкачать и установить?")
-                        .setPositiveButton("Установить") { _, _ -> downloadAndInstall(url) }
-                        .setNegativeButton("Позже", null).show()
+                    AlertDialog.Builder(this@MainActivity).setTitle("Обновление $tag").setMessage("Скачать и установить?").setPositiveButton("Установить") { _, _ -> downloadAndInstall(url) }.setNegativeButton("Позже", null).show()
                 }
-            } catch (e: Exception) { /* тихо */ }
+            } catch (e: Exception) {}
         }
     }
 
@@ -405,8 +377,7 @@ class MainActivity : AppCompatActivity() {
                     c.inputStream.use { i -> FileOutputStream(file).use { o -> i.copyTo(o) } }; file
                 }
                 p.dismiss()
-                val uri = FileProvider.getUriForFile(this@MainActivity, "${packageName}.fileprovider", f)
-                startActivity(Intent(Intent.ACTION_VIEW).apply { setDataAndType(uri, "application/vnd.android.package-archive"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK) })
+                startActivity(Intent(Intent.ACTION_VIEW).apply { setDataAndType(FileProvider.getUriForFile(this@MainActivity, "${packageName}.fileprovider", f), "application/vnd.android.package-archive"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK) })
             } catch (e: Exception) { p.dismiss(); runOnUiThread { Toast.makeText(this@MainActivity, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() } }
         }
     }
