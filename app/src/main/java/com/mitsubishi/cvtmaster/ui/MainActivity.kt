@@ -381,15 +381,24 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val json = withContext(Dispatchers.IO) {
-                    val c = URL(GITHUB_API).openConnection() as HttpURLConnection
-                    c.setRequestProperty("Accept", "application/vnd.github.v3+json")
-                    c.connectTimeout = 5000; c.readTimeout = 5000
-                    c.inputStream.bufferedReader().readText()
+                    val url = URL(GITHUB_API)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                    conn.setRequestProperty("User-Agent", "CVT-Master")
+                    conn.connectTimeout = 10000
+                    conn.readTimeout = 10000
+                    conn.instanceFollowRedirects = true
+                    val code = conn.responseCode
+                    if (code == 200) {
+                        conn.inputStream.bufferedReader().readText()
+                    } else {
+                        throw Exception("HTTP $code")
+                    }
                 }
                 val tag = json.split("\"tag_name\":\"")[1].split("\"")[0]
                 val downloadUrl = json.split("\"browser_download_url\":\"")[1].split("\"")[0]
                 runOnUiThread {
-                    if (tag != "v1.0.11") {
+                    if (tag != "v1.0.12") {
                         AlertDialog.Builder(this@MainActivity)
                             .setTitle("Доступно обновление $tag")
                             .setMessage("Скачать и установить?")
@@ -397,27 +406,62 @@ class MainActivity : AppCompatActivity() {
                             .setNegativeButton("Позже", null).show()
                     }
                 }
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+                // Тихо игнорируем при автопроверке
+            }
         }
     }
 
     private fun downloadAndInstall(url: String) {
+        val progress = AlertDialog.Builder(this@MainActivity)
+            .setTitle("Загрузка обновления")
+            .setMessage("Пожалуйста, подождите...")
+            .setCancelable(false)
+            .create()
+        progress.show()
+        
         lifecycleScope.launch {
             try {
                 val apkFile = withContext(Dispatchers.IO) {
+                    val conn = URL(url).openConnection() as HttpURLConnection
+                    conn.setRequestProperty("User-Agent", "CVT-Master")
+                    conn.connectTimeout = 30000
+                    conn.readTimeout = 30000
+                    conn.instanceFollowRedirects = true
+                    
                     val file = File(getExternalFilesDir(null), "update.apk")
-                    URL(url).openConnection().getInputStream().use { i -> FileOutputStream(file).use { o -> i.copyTo(o) } }
+                    conn.inputStream.use { input ->
+                        FileOutputStream(file).use { output ->
+                            val buffer = ByteArray(8192)
+                            var bytes: Int
+                            while (input.read(buffer).also { bytes = it } != -1) {
+                                output.write(buffer, 0, bytes)
+                            }
+                        }
+                    }
                     file
                 }
-                val apkUri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", apkFile)
+                
+                progress.dismiss()
+                
+                val apkUri = FileProvider.getUriForFile(
+                    this@MainActivity, 
+                    "${packageName}.fileprovider", 
+                    apkFile
+                )
+                
                 val intent = Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(apkUri, "application/vnd.android.package-archive")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 startActivity(intent)
+                
             } catch (e: Exception) {
-                runOnUiThread { Toast.makeText(this@MainActivity, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
+                progress.dismiss()
+                runOnUiThread { 
+                    Toast.makeText(this@MainActivity, "Ошибка загрузки: ${e.message}", Toast.LENGTH_LONG).show() 
+                }
             }
         }
     }
