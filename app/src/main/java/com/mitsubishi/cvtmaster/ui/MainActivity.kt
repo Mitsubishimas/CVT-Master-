@@ -60,7 +60,6 @@ class MainActivity : AppCompatActivity() {
         initViews()
         initManagers()
         requestPermissions()
-        checkBluetoothEnabled()
         observeConnectionState()
     }
 
@@ -150,20 +149,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkBluetoothEnabled() {
-        val btAdapter = BluetoothAdapter.getDefaultAdapter()
-        if (btAdapter != null && !btAdapter.isEnabled) {
-            startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BT)
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_ENABLE_BT) {
-            Toast.makeText(this, if (resultCode == RESULT_OK) "Bluetooth включен" else "Bluetooth не включен", Toast.LENGTH_SHORT).show()
-        }
-    }
-
     private fun requestPermissions() {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -180,16 +165,31 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
             permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
         if (permissions.isNotEmpty()) {
-            androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Разрешения")
-                .setMessage("Для работы с ELM327 нужны разрешения Bluetooth и местоположения")
-                .setPositiveButton("OK") { _, _ -> ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST) }
-                .show()
+            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST)
         }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST) {
+            if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                checkBluetoothEnabled()
+            }
+        }
+    }
+
+    private fun checkBluetoothEnabled() {
+        val btAdapter = BluetoothAdapter.getDefaultAdapter()
+        if (btAdapter != null && !btAdapter.isEnabled) {
+            startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQUEST_ENABLE_BT)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_ENABLE_BT) {
+            Toast.makeText(this, if (resultCode == RESULT_OK) "Bluetooth включен" else "Bluetooth не включен", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun observeConnectionState() {
@@ -245,7 +245,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Подключение к " + devices[0].name + "...", Toast.LENGTH_SHORT).show()
             bluetoothManager.connectToDevice(devices[0].address)
         } else {
-            Toast.makeText(this, "Нет сопряженных устройств. Сопрягите ELM327 в настройках", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Нет сопряженных устройств. Сопрягите ELM327 в настройках Bluetooth", Toast.LENGTH_LONG).show()
         }
     }
 
