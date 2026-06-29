@@ -323,7 +323,15 @@ class MainActivity : AppCompatActivity() {
                                 tvGearRatio.text = String.format("%.2f", data.gearRatio)
                                 tvBeltWear.text = data.beltWearIndex.toString() + "%"
                                 tvTccStatus.text = data.torqueConverterLockup.name
-                                tvGearPosition.text = data.gearPosition.name
+                                tvGearPosition.text = when (data.gearPosition) {
+    GearPosition.PARK -> "P"
+    GearPosition.REVERSE -> "R"
+    GearPosition.NEUTRAL -> "N"
+    GearPosition.DRIVE -> "D"
+    GearPosition.MANUAL -> "M"
+    GearPosition.SPORT -> "S"
+    else -> data.gearPosition.name
+}
                                 graphView.addTemperatureData(data.oilTemperature)
                                 graphView.addPressureData(data.primaryPressure)
                                 if (temp >= 106) {
@@ -398,7 +406,7 @@ class MainActivity : AppCompatActivity() {
                 val tag = json.split("\"tag_name\":\"")[1].split("\"")[0]
                 val downloadUrl = json.split("\"browser_download_url\":\"")[1].split("\"")[0]
                 runOnUiThread {
-                    if (tag != "v1.0.12") {
+                    if (tag != "v1.0.13") {
                         AlertDialog.Builder(this@MainActivity)
                             .setTitle("Доступно обновление $tag")
                             .setMessage("Скачать и установить?")
