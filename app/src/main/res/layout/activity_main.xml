@@ -1,124 +1,120 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:background="#1C1C1E">
+    android:background="@color/background">
     
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="CVT Master"
-        android:textSize="28sp"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"/>
-    
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Mitsubishi Edition"
-        android:textSize="14sp"
-        android:textColor="#FF6200EE"/>
-    
-    <!-- Статус подключения -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:background="#2C2C2E"
-        android:padding="12dp"
-        android:layout_marginTop="16dp">
+    <!-- Верхняя панель -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/surface"
+        app:title="@string/app_name"
+        app:titleTextColor="@color/white"
+        app:subtitle="@string/app_subtitle"
+        app:subtitleTextColor="@color/primary"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
         
-        <View
-            android:layout_width="12dp"
-            android:layout_height="12dp"
-            android:background="#FF3B30"/>
-        
-        <TextView
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Не подключено"
-            android:textColor="#FFFFFF"
-            android:layout_marginStart="8dp"/>
-    </LinearLayout>
+            android:layout_gravity="end"
+            android:orientation="horizontal">
+            
+            <TextView
+                android:id="@+id/tv_connection_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/bt_disconnected"
+                android:textColor="@color/error"
+                android:textSize="@dimen/text_small"
+                android:layout_marginEnd="16dp"/>
+            
+            <Button
+                android:id="@+id/btn_connect"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="@string/bt_connect"
+                android:textSize="@dimen/text_small"/>
+        </LinearLayout>
+    </com.google.android.material.appbar.MaterialToolbar>
     
-    <!-- Панель мониторинга -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="16dp">
+    <!-- Основной контент -->
+    <ScrollView
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        app:layout_constraintTop_toBottomOf="@id/toolbar"
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
         
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:orientation="vertical"
-            android:background="#2C2C2E"
-            android:padding="12dp"
-            android:layout_marginEnd="8dp">
+            android:padding="@dimen/padding_medium">
             
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Температура CVT"
-                android:textColor="#8E8E93"
-                android:textSize="12sp"/>
+            <!-- Панель CVT данных -->
+            <include layout="@layout/layout_cvt_dashboard"/>
             
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- Кнопки действий -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="--°C"
-                android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:textStyle="bold"/>
+                android:orientation="horizontal"
+                android:layout_marginTop="@dimen/padding_medium">
+                
+                <Button
+                    android:id="@+id/btn_scan_dtc"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_weight="1"
+                    android:text="@string/action_scan_dtc"
+                    android:textSize="@dimen/text_small"
+                    android:layout_marginEnd="8dp"/>
+                
+                <Button
+                    android:id="@+id/btn_reset_degradation"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_weight="1"
+                    android:text="@string/action_reset_degradation"
+                    android:textSize="@dimen/text_small"/>
+            </LinearLayout>
+            
+            <!-- Кнопка экспорта -->
+            <Button
+                android:id="@+id/btn_export_logs"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/button_height"
+                android:text="@string/action_export_csv"
+                android:textSize="@dimen/text_small"
+                android:layout_marginTop="8dp"/>
         </LinearLayout>
+    </ScrollView>
+    
+    <!-- Нижняя навигация -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@color/surface"
+        app:menu="@menu/bottom_nav_menu"
+        app:labelVisibilityMode="labeled"
+        app:itemTextColor="@color/white"
+        app:itemIconTint="@color/primary"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
         
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:background="#2C2C2E"
-            android:padding="12dp">
-            
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Деградация масла"
-                android:textColor="#8E8E93"
-                android:textSize="12sp"/>
-            
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="--"
-                android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:textStyle="bold"/>
-        </LinearLayout>
-    </LinearLayout>
-    
-    <!-- Кнопки действий -->
-    <Button
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Сканировать ошибки"
-        android:layout_marginTop="16dp"
-        android:backgroundTint="#FF6200EE"/>
-    
-    <Button
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Сбросить счетчик деградации"
-        android:layout_marginTop="8dp"
-        android:backgroundTint="#FF3B30"/>
-    
-    <Button
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Обучение CVT"
-        android:layout_marginTop="8dp"
-        android:backgroundTint="#34C759"/>
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

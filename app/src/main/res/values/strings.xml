@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CVT Master</string>
+    <string name="app_subtitle">Mitsubishi Edition</string>
+    <string name="app_version">1.0.0</string>
+    
+    <!-- Навигация -->
+    <string name="tab_dashboard">Приборная панель</string>
+    <string name="tab_graphs">Графики</string>
+    <string name="tab_dtc">Ошибки</string>
+    <string name="tab_service">Сервис</string>
+    <string name="tab_logs">Логи</string>
+    
+    <!-- Bluetooth -->
+    <string name="bt_connect">Подключить ELM327</string>
+    <string name="bt_disconnect">Отключить</string>
+    <string name="bt_scanning">Поиск устройств…</string>
+    <string name="bt_not_supported">Bluetooth не поддерживается</string>
+    <string name="bt_not_enabled">Включите Bluetooth</string>
+    <string name="bt_connecting">Подключение…</string>
+    <string name="bt_connected">Подключено</string>
+    <string name="bt_disconnected">Не подключено</string>
+    <string name="bt_error">Ошибка подключения</string>
+    <string name="bt_no_devices">Устройства не найдены</string>
+    <string name="bt_select_device">Выберите устройство</string>
+    
+    <!-- CVT Параметры -->
+    <string name="cvt_temperature">Температура CVT</string>
+    <string name="cvt_oil_degradation">Деградация масла</string>
+    <string name="cvt_primary_pressure">Давление первичное</string>
+    <string name="cvt_secondary_pressure">Давление вторичное</string>
+    <string name="cvt_engine_rpm">Обороты двигателя</string>
+    <string name="cvt_gear_ratio">Передаточное число</string>
+    <string name="cvt_belt_wear">Износ ремня</string>
+    <string name="cvt_tcc_status">Блокировка ГТ</string>
+    
+    <!-- Действия -->
+    <string name="action_scan_dtc">Сканировать ошибки</string>
+    <string name="action_reset_degradation">Сбросить счетчик деградации</string>
+    <string name="action_relearn_cvt">Обучение CVT</string>
+    <string name="action_export_csv">Экспорт CSV</string>
+    <string name="action_export_json">Экспорт JSON</string>
+    <string name="action_export_report">Экспорт отчета</string>
+    <string name="action_share">Поделиться</string>
+    
+    <!-- Состояния -->
+    <string name="status_good">В норме</string>
+    <string name="status_warning">Внимание</string>
+    <string name="status_critical">Критично</string>
+    <string name="status_unknown">Неизвестно</string>
+    
+    <!-- Разрешения -->
+    <string name="permission_bluetooth_title">Доступ к Bluetooth</string>
+    <string name="permission_bluetooth_message">Необходим для подключения к ELM327</string>
+    <string name="permission_location_title">Доступ к местоположению</string>
+    <string name="permission_location_message">Необходим для поиска Bluetooth устройств</string>
+    <string name="permission_storage_title">Доступ к файлам</string>
+    <string name="permission_storage_message">Необходим для сохранения логов</string>
+    
+    <!-- Уведомления -->
+    <string name="notification_channel_service">Сервис CVT Master</string>
+    <string name="notification_collecting">Сбор данных CVT…</string>
+    <string name="notification_overheat">⚠ Перегрев вариатора!</string>
+    <string name="notification_oil_change">Требуется замена масла</string>
+</resources>

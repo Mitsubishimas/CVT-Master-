@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CVT Мастер</string>
+    <string name="app_subtitle">Mitsubishi Версия</string>
+    
+    <string name="tab_dashboard">Приборы</string>
+    <string name="tab_graphs">Графики</string>
+    <string name="tab_dtc">Ошибки</string>
+    <string name="tab_service">Сервис</string>
+    <string name="tab_logs">Логи</string>
+    
+    <string name="bt_connect">Подключить ELM327</string>
+    <string name="bt_disconnect">Отключить</string>
+    <string name="bt_scanning">Поиск устройств…</string>
+    <string name="bt_connected">Подключено</string>
+    <string name="bt_disconnected">Не подключено</string>
+    
+    <string name="cvt_temperature">Температура вариатора</string>
+    <string name="cvt_oil_degradation">Старение масла</string>
+    <string name="action_reset_degradation">Сбросить счетчик старения</string>
+    
+    <string name="status_good">Норма</string>
+    <string name="status_warning">Внимание</string>
+    <string name="status_critical">Критично</string>
+    
+    <string name="notification_overheat">⚠ Перегрев вариатора!</string>
+    <string name="notification_oil_change">Необходима замена масла</string>
+</resources>

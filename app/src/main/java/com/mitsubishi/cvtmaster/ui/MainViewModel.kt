@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.*
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     
-    private val bluetoothManager = BluetoothManager(application)
-    private val dataLogger = DataLogger(application)
-    private val diagnostic = MitsubishiDiagnostic()
-    private val pidParser = JatcoPIDParser()
+    val bluetoothManager = BluetoothManager(application)
+    val dataLogger = DataLogger(application)
+    val diagnostic = MitsubishiDiagnostic()
+    val pidParser = JatcoPIDParser()
     
     val connectionState = bluetoothManager.connectionState
     val discoveredDevices = bluetoothManager.discoveredDevices
@@ -25,76 +25,70 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _healthReport = MutableStateFlow<MitsubishiDiagnostic.CVTHealthReport?>(null)
     val healthReport: StateFlow<MitsubishiDiagnostic.CVTHealthReport?> = _healthReport
     
-    private var dataCollectionJob: Job? = null
+    private var collectionJob: Job? = null
+    
+    fun connectToDevice(address: String) {
+        bluetoothManager.connectToDevice(address)
+    }
+    
+    fun disconnect() {
+        bluetoothManager.disconnect()
+    }
     
     fun startScanning() {
         bluetoothManager.startScanning()
     }
     
-    fun connectToDevice(macAddress: String) {
-        viewModelScope.launch {
-            bluetoothManager.connectToDevice(macAddress)
-            
-            // Ожидаем подключения
-            while (bluetoothManager.connectionState.value != BluetoothConnectionState.READY) {
-                delay(100)
-            }
-            
-            // Запускаем сбор данных
-            startDataCollection()
-        }
-    }
-    
-    private fun startDataCollection() {
-        dataCollectionJob?.cancel()
-        dataCollectionJob = viewModelScope.launch {
+    fun startDataCollection() {
+        collectionJob?.cancel()
+        collectionJob = viewModelScope.launch {
             while (isActive) {
                 try {
-                    val data = bluetoothManager.requestCVTData()
+                    val response = bluetoothManager.sendRawCommand("01 00")
+                    // Правильное имя метода: parseELM327Response
+                    val data = pidParser.parseELM327Response(response)
+                    
                     if (data != null) {
                         _cvtData.value = data
                         dataLogger.addEntry(data)
                         
-                        // Анализируем состояние
-                        val report = diagnostic.analyzeCVTHealth(
+                        _healthReport.value = diagnostic.analyzeCVTHealth(
                             oilDegradation = data.oilDegradation,
                             cvtTemp = data.oilTemperature,
                             primaryPressure = data.primaryPressure,
                             secondaryPressure = data.secondaryPressure,
-                            mileage = 0  // Здесь нужно получить пробег из ECM
+                            mileage = 0
                         )
-                        _healthReport.value = report
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    // Ignore collection errors
                 }
-                
-                delay(500)  // Запрос каждые 500мс
+                delay(500)
             }
         }
     }
     
+    fun stopDataCollection() {
+        collectionJob?.cancel()
+    }
+    
     fun resetOilDegradation() {
         viewModelScope.launch {
-            bluetoothManager.resetOilDegradation()
+            val resetter = OilDegradationReset()
+            resetter.resetJF011E(bluetoothManager)
         }
     }
     
-    fun exportLogs() {
+    fun exportData() {
         viewModelScope.launch {
             dataLogger.exportToCSV()
-            dataLogger.exportToJSON()
-            dataLogger.exportReport()
         }
-    }
-    
-    fun disconnect() {
-        dataCollectionJob?.cancel()
-        bluetoothManager.disconnect()
     }
     
     override fun onCleared() {
         super.onCleared()
-        disconnect()
+        bluetoothManager.cleanup()
     }
 }

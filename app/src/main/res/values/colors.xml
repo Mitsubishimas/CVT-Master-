@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mitsubishi Red -->
+    <color name="primary">#FFE60012</color>
+    <color name="primary_dark">#FFB8000A</color>
+    <color name="primary_light">#FFFF3B3F</color>
+    
+    <!-- Акценты -->
+    <color name="secondary">#FF1A1A2E</color>
+    <color name="secondary_dark">#FF0F0F1A</color>
+    
+    <!-- Фоны -->
+    <color name="background">#FF0A0A0F</color>
+    <color name="surface">#FF1C1C24</color>
+    <color name="surface_variant">#FF2C2C36</color>
+    
+    <!-- Текст -->
+    <color name="on_surface">#FFFFFFFF</color>
+    <color name="on_surface_variant">#FF8E8E93</color>
+    <color name="text_secondary">#FFAEAEB2</color>
+    
+    <!-- Статусы -->
+    <color name="error">#FFFF3B30</color>
+    <color name="warning">#FFFF9500</color>
+    <color name="success">#FF34C759</color>
+    <color name="info">#FF007AFF</color>
+    
+    <!-- CVT параметры -->
+    <color name="cvt_temp_normal">#FF34C759</color>
+    <color name="cvt_temp_warning">#FFFF9500</color>
+    <color name="cvt_temp_critical">#FFFF3B30</color>
+    <color name="cvt_pressure">#FF007AFF</color>
+    <color name="cvt_rpm">#FF5AC8FA</color>
+    
+    <!-- Базовые -->
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>
