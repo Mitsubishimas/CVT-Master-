@@ -4,6 +4,7 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.*
@@ -11,6 +12,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.mitsubishi.cvtmaster.R
 import com.mitsubishi.cvtmaster.core.MitsubishiDiagnostic
@@ -28,6 +30,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val PERMISSION_REQUEST = 100
         private const val REQUEST_ENABLE_BT = 101
+        private const val REQUEST_INSTALL = 102
         private const val GITHUB_API = "https://api.github.com/repos/Mitsubishimas/CVT-Master-/releases/latest"
     }
 
@@ -45,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvBeltWear: TextView
     private lateinit var tvTccStatus: TextView
     private lateinit var tvGearPosition: TextView
+    private lateinit var tvCvtInfo: TextView
     private lateinit var btnConnect: Button
     private lateinit var btnScanDtc: Button
     private lateinit var btnResetDegradation: Button
@@ -62,6 +66,7 @@ class MainActivity : AppCompatActivity() {
         initManagers()
         requestPermissions()
         observeConnectionState()
+        checkForUpdates() // Автопроверка при старте
     }
 
     private fun initViews() {
@@ -82,6 +87,7 @@ class MainActivity : AppCompatActivity() {
         btnCheckUpdate = findViewById(R.id.btn_check_update)
         bottomNav = findViewById(R.id.bottom_nav)
         contentContainer = findViewById(R.id.content_container)
+        tvCvtInfo = TextView(this).apply { text = ""; setTextColor(0xFFAAAAAA.toInt()); textSize = 11f; setPadding(0,8,0,0) }
         graphView = CVTGraphView(this)
         setupClickListeners()
         setupNavigation()
@@ -121,6 +127,7 @@ class MainActivity : AppCompatActivity() {
                     tvBeltWear = d.findViewById(R.id.tv_belt_wear)
                     tvTccStatus = d.findViewById(R.id.tv_tcc_status)
                     tvGearPosition = d.findViewById(R.id.tv_gear_position)
+                    contentContainer.addView(tvCvtInfo)
                 }
                 R.id.nav_graphs -> {
                     graphView = CVTGraphView(this)
@@ -165,6 +172,10 @@ class MainActivity : AppCompatActivity() {
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
             permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (packageManager.canRequestPackageInstalls().not())
+                permissions.add(Manifest.permission.REQUEST_INSTALL_PACKAGES)
+        }
         if (permissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), PERMISSION_REQUEST)
         }
@@ -174,6 +185,11 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
             checkBluetoothEnabled()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && packageManager.canRequestPackageInstalls().not()) {
+                startActivityForResult(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:$packageName")
+                }, REQUEST_INSTALL)
+            }
         }
     }
 
@@ -186,8 +202,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_ENABLE_BT) {
-            Toast.makeText(this, if (resultCode == RESULT_OK) "Bluetooth включен" else "Bluetooth не включен", Toast.LENGTH_SHORT).show()
+        when (requestCode) {
+            REQUEST_ENABLE_BT -> Toast.makeText(this, if (resultCode == RESULT_OK) "Bluetooth включен" else "Bluetooth не включен", Toast.LENGTH_SHORT).show()
+            REQUEST_INSTALL -> {
+                if (resultCode == RESULT_OK && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && packageManager.canRequestPackageInstalls()) {
+                    Toast.makeText(this, "Установка из неизвестных источников разрешена", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -207,6 +228,7 @@ class MainActivity : AppCompatActivity() {
                             tvConnectionStatus.setTextColor(getColor(R.color.success))
                             btnConnect.text = "Отключить"
                             startDataCollection()
+                            requestCvtInfo() // Запрашиваем данные вариатора
                         }
                         ConnectionState.CONNECTING -> {
                             tvConnectionStatus.text = "Подключение..."
@@ -222,6 +244,27 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun requestCvtInfo() {
+        lifecycleScope.launch {
+            try {
+                // Запрос идентификаторов вариатора
+                val calId = bluetoothManager.sendRawCommand("09 04") // Calibration ID
+                val vin = bluetoothManager.sendRawCommand("09 02")   // VIN
+                val ecuName = bluetoothManager.sendRawCommand("09 0A") // ECU Name
+                
+                runOnUiThread {
+                    val info = StringBuilder()
+                    if (calId.isNotBlank()) info.append("CAL: $calId\n")
+                    if (vin.isNotBlank()) info.append("VIN: $vin\n")
+                    if (ecuName.isNotBlank()) info.append("ECU: $ecuName\n")
+                    if (info.isNotEmpty()) {
+                        tvCvtInfo.text = info.toString()
+                    }
+                }
+            } catch (e: Exception) {}
         }
     }
 
@@ -246,12 +289,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (devices.size == 1) {
-            // Одно устройство - подключаемся сразу
             Toast.makeText(this, "Подключение к " + devices[0].name + "...", Toast.LENGTH_SHORT).show()
             bluetoothManager.connectToDevice(devices[0].address)
         } else {
-            // Несколько устройств - показываем диалог выбора
-            val names = devices.map { it.name + "\n" + it.address }.toTypedArray()
+            val names = devices.map { it.name }.toTypedArray()
             AlertDialog.Builder(this)
                 .setTitle("Выберите ELM327")
                 .setItems(names) { _, which ->
@@ -345,29 +386,75 @@ class MainActivity : AppCompatActivity() {
                     c.inputStream.bufferedReader().readText()
                 }
                 val tag = json.split("\"tag_name\":\"")[1].split("\"")[0]
+                val downloadUrl = json.split("\"browser_download_url\":\"")[1].split("\"")[0]
+                
                 runOnUiThread {
-                    if (tag != "v1.0.7") {
-                        val url = json.split("\"browser_download_url\":\"")[1].split("\"")[0]
+                    if (tag != "v1.0.10") {
                         AlertDialog.Builder(this@MainActivity)
-                            .setTitle("Обновление " + tag).setMessage("Скачать?")
-                            .setPositiveButton("Да") { _, _ -> downloadUpdate(url) }
-                            .setNegativeButton("Нет", null).show()
-                    } else Toast.makeText(this@MainActivity, "Версия актуальна", Toast.LENGTH_SHORT).show()
+                            .setTitle("Доступно обновление $tag")
+                            .setMessage("Скачать и установить новую версию?")
+                            .setPositiveButton("Установить") { _, _ -> downloadAndInstall(downloadUrl) }
+                            .setNegativeButton("Позже", null)
+                            .show()
+                    }
                 }
             } catch (e: Exception) {}
         }
     }
 
-    private fun downloadUpdate(url: String) {
+    private fun downloadAndInstall(url: String) {
         lifecycleScope.launch {
+            val progress = ProgressDialog(this@MainActivity)
+            progress.setMessage("Загрузка обновления...")
+            progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL)
+            progress.setCancelable(false)
+            progress.show()
+            
             try {
-                withContext(Dispatchers.IO) {
-                    val f = File(getExternalFilesDir(null), "update.apk")
-                    URL(url).openConnection().getInputStream().use { i -> FileOutputStream(f).use { o -> i.copyTo(o) } }
-                    val u = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, packageName + ".fileprovider", f)
-                    startActivity(Intent(Intent.ACTION_VIEW).apply { setDataAndType(u, "application/vnd.android.package-archive"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) })
+                val apkFile = withContext(Dispatchers.IO) {
+                    val conn = URL(url).openConnection() as HttpURLConnection
+                    val fileSize = conn.contentLength
+                    progress.max = fileSize
+                    
+                    val file = File(getExternalFilesDir(null), "update.apk")
+                    conn.inputStream.use { input ->
+                        FileOutputStream(file).use { output ->
+                            val buffer = ByteArray(8192)
+                            var total = 0L
+                            var bytesRead: Int
+                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                                output.write(buffer, 0, bytesRead)
+                                total += bytesRead
+                                progress.progress = total.toInt()
+                            }
+                        }
+                    }
+                    file
                 }
-            } catch (e: Exception) {}
+                
+                progress.dismiss()
+                
+                // Установка APK
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+                    startActivityForResult(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:$packageName")
+                    }, REQUEST_INSTALL)
+                }
+                
+                val apkUri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", apkFile)
+                val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(apkUri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(installIntent)
+                
+            } catch (e: Exception) {
+                progress.dismiss()
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -388,4 +475,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() { super.onDestroy(); disconnect() }
+}
+
+// Простой ProgressDialog
+class ProgressDialog(context: android.content.Context) : AlertDialog(context) {
+    private val progressBar = ProgressBar(context).apply { isIndeterminate = false }
+    private val textView = TextView(context)
+    
+    init {
+        val layout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 32)
+            addView(textView)
+            addView(progressBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 16 })
+        }
+        setView(layout)
+    }
+    
+    fun setMessage(msg: String) { textView.text = msg }
+    var progress: Int
+        get() = progressBar.progress
+        set(v) { progressBar.progress = v }
+    var max: Int
+        get() = progressBar.max
+        set(v) { progressBar.max = v }
 }
