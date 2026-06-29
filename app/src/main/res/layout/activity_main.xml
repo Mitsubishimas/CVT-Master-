@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:background="@color/background">
     
-    <!-- Верхняя панель -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="0dp"
@@ -14,8 +13,6 @@
         android:background="@color/surface"
         app:title="@string/app_name"
         app:titleTextColor="@color/white"
-        app:subtitle="@string/app_subtitle"
-        app:subtitleTextColor="@color/primary"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -32,8 +29,8 @@
                 android:layout_height="wrap_content"
                 android:text="@string/bt_disconnected"
                 android:textColor="@color/error"
-                android:textSize="@dimen/text_small"
-                android:layout_marginEnd="16dp"/>
+                android:textSize="12sp"
+                android:layout_marginEnd="8dp"/>
             
             <Button
                 android:id="@+id/btn_connect"
@@ -41,69 +38,80 @@
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
                 android:text="@string/bt_connect"
-                android:textSize="@dimen/text_small"/>
+                android:textSize="12sp"/>
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
     
-    <!-- Основной контент -->
+    <LinearLayout
+        android:id="@+id/action_buttons"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        app:layout_constraintTop_toBottomOf="@id/toolbar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+        
+        <Button
+            android:id="@+id/btn_scan_dtc"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="Сканировать"
+            android:textSize="11sp"
+            android:layout_marginEnd="4dp"/>
+        
+        <Button
+            android:id="@+id/btn_reset_degradation"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="Сброс счетчика"
+            android:textSize="11sp"
+            android:layout_marginEnd="4dp"/>
+        
+        <Button
+            android:id="@+id/btn_export_logs"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="Экспорт"
+            android:textSize="11sp"
+            android:layout_marginEnd="4dp"/>
+        
+        <Button
+            android:id="@+id/btn_check_update"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="Обновить"
+            android:textSize="11sp"/>
+    </LinearLayout>
+    
     <ScrollView
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:fillViewport="true"
-        app:layout_constraintTop_toBottomOf="@id/toolbar"
+        app:layout_constraintTop_toBottomOf="@id/action_buttons"
         app:layout_constraintBottom_toTopOf="@id/bottom_nav"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
         
         <LinearLayout
+            android:id="@+id/content_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="@dimen/padding_medium">
+            android:padding="12dp">
             
-            <!-- Панель CVT данных -->
             <include layout="@layout/layout_cvt_dashboard"/>
-            
-            <!-- Кнопки действий -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="@dimen/padding_medium">
-                
-                <Button
-                    android:id="@+id/btn_scan_dtc"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="0dp"
-                    android:layout_height="@dimen/button_height"
-                    android:layout_weight="1"
-                    android:text="@string/action_scan_dtc"
-                    android:textSize="@dimen/text_small"
-                    android:layout_marginEnd="8dp"/>
-                
-                <Button
-                    android:id="@+id/btn_reset_degradation"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="@dimen/button_height"
-                    android:layout_weight="1"
-                    android:text="@string/action_reset_degradation"
-                    android:textSize="@dimen/text_small"/>
-            </LinearLayout>
-            
-            <!-- Кнопка экспорта -->
-            <Button
-                android:id="@+id/btn_export_logs"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/button_height"
-                android:text="@string/action_export_csv"
-                android:textSize="@dimen/text_small"
-                android:layout_marginTop="8dp"/>
         </LinearLayout>
     </ScrollView>
     
-    <!-- Нижняя навигация -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"
         android:layout_width="0dp"

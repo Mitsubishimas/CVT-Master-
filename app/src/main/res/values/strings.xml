@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">CVT Master</string>
     <string name="app_subtitle">Mitsubishi Edition</string>
-    <string name="app_version">1.0.0</string>
+    <string name="app_version">1.0.2</string>
     
     <!-- Навигация -->
     <string name="tab_dashboard">Приборная панель</string>
