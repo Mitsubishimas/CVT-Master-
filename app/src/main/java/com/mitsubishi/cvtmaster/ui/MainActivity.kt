@@ -32,6 +32,11 @@ class MainActivity : AppCompatActivity() {
         private const val PERMISSION_REQUEST = 100
         private const val REQUEST_ENABLE_BT = 101
         private const val GITHUB_API = "https://api.github.com/repos/Mitsubishimas/CVT-Master-/releases/latest"
+        // Правильные CAN ID для Mitsubishi
+        private const val TCM_REQUEST = "7E2"  // Физический адрес TCM (запрос)
+        private const val TCM_RESPONSE = "7E9" // Ответ от TCM
+        private const val ECM_REQUEST = "7E0"  // ECM запрос
+        private const val ECM_RESPONSE = "7E8" // ECM ответ
     }
 
     private lateinit var bluetoothManager: BluetoothManager
@@ -139,7 +144,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 R.id.nav_dtc -> {
                     contentContainer.addView(TextView(this).apply {
-                        text = "Нажмите Сканировать для проверки ошибок"
+                        text = "Нажмите Сканировать"
                         setTextColor(getColor(R.color.white)); textSize = 16f; setPadding(32, 32, 32, 32)
                     })
                 }
@@ -246,62 +251,66 @@ class MainActivity : AppCompatActivity() {
     private fun initELM327ForCar() {
         lifecycleScope.launch {
             try {
-                runOnUiThread { tvConnectionStatus.text = "Инициализация..." }
+                runOnUiThread { 
+                    tvConnectionStatus.text = "Инициализация..."
+                    tvCvtInfo.text = "Настройка ELM327..."
+                }
                 
+                // Сброс
                 bluetoothManager.sendRawCommand("ATZ")
-                delay(1500)
+                delay(2000)
+                // Эхо выкл
                 bluetoothManager.sendRawCommand("ATE0")
-                delay(100)
-                bluetoothManager.sendRawCommand("ATL0")
-                delay(50)
-                bluetoothManager.sendRawCommand("ATS1")
-                delay(50)
-                bluetoothManager.sendRawCommand("ATH1")
-                delay(100)
-                bluetoothManager.sendRawCommand("ATSP6")
                 delay(200)
-                bluetoothManager.sendRawCommand("ATSH 7E2")
+                // Linefeed выкл
+                bluetoothManager.sendRawCommand("ATL0")
                 delay(100)
-                bluetoothManager.sendRawCommand("ATCF 7E2")
-                delay(50)
-                bluetoothManager.sendRawCommand("ATCRA 7EA")
-                delay(50)
+                // Пробелы вкл
+                bluetoothManager.sendRawCommand("ATS1")
+                delay(100)
+                // Заголовки вкл
+                bluetoothManager.sendRawCommand("ATH1")
+                delay(200)
+                // Автоопределение протокола
+                bluetoothManager.sendRawCommand("ATSP0")
+                delay(2000)
+                
+                // Получаем версию ELM327
+                val elmVersion = bluetoothManager.sendRawCommand("ATI")
+                delay(200)
+                
+                // Настраиваем физическую адресацию Mitsubishi:
+                // Устанавливаем заголовок отправки = TCM физический адрес
+                bluetoothManager.sendRawCommand("ATSH $TCM_REQUEST")
+                delay(100)
+                // Устанавливаем фильтр на ответ от TCM
+                bluetoothManager.sendRawCommand("ATCRA $TCM_RESPONSE")
+                delay(100)
+                // Фильтр CAN ID для приема
+                bluetoothManager.sendRawCommand("ATCF $TCM_RESPONSE")
+                delay(100)
+                
+                // Проверяем связь с TCM - запрос поддерживаемых PID
+                val tcmResponse = bluetoothManager.sendRawCommand("01 00")
+                delay(200)
                 
                 runOnUiThread {
                     tvConnectionStatus.text = "Подключено к Mitsubishi"
-                    tvCvtInfo.text = "CAN: ISO 15765-4 | TCM: 0x7E2"
+                    tvCvtInfo.text = "ELM: $elmVersion\n" +
+                        "TCM запрос: 0x$TCM_REQUEST\n" +
+                        "TCM ответ: 0x$TCM_RESPONSE\n" +
+                        "ECM запрос: 0x$ECM_REQUEST\n" +
+                        "ECM ответ: 0x$ECM_RESPONSE"
                 }
                 
-                requestCarInfo()
                 startDataCollection()
-            } catch (e: Exception) {
-                runOnUiThread { tvConnectionStatus.text = "Ошибка инициализации" }
-            }
-        }
-    }
-
-    private fun requestCarInfo() {
-        lifecycleScope.launch {
-            try {
-                bluetoothManager.sendRawCommand("ATSH 7E0")
-                delay(50)
-                bluetoothManager.sendRawCommand("ATFCSH 7E0")
-                delay(50)
-                val vin = bluetoothManager.sendRawCommand("09 02")
-                val calId = bluetoothManager.sendRawCommand("09 04")
-                bluetoothManager.sendRawCommand("ATSH 7E2")
-                delay(50)
-                bluetoothManager.sendRawCommand("ATFCSH 7E2")
                 
-                runOnUiThread {
-                    val info = StringBuilder()
-                    info.append("=== Mitsubishi CVT Master ===\n")
-                    if (vin.isNotBlank() && vin.length > 10) info.append("VIN: $vin\n")
-                    if (calId.isNotBlank()) info.append("CAL: $calId\n")
-                    info.append("TCM: 0x7E2 | ECM: 0x7E0")
-                    tvCvtInfo.text = info.toString()
+            } catch (e: Exception) {
+                runOnUiThread { 
+                    tvConnectionStatus.text = "Ошибка инициализации"
+                    tvCvtInfo.text = "Ошибка: ${e.message}"
                 }
-            } catch (e: Exception) {}
+            }
         }
     }
 
@@ -343,48 +352,49 @@ class MainActivity : AppCompatActivity() {
         dataCollectionJob = lifecycleScope.launch {
             while (isActive) {
                 try {
-                    val tempResp = bluetoothManager.sendRawCommand("22 2105")
-                    delay(30)
-                    val press1Resp = bluetoothManager.sendRawCommand("22 2107")
-                    delay(30)
-                    val degradResp = bluetoothManager.sendRawCommand("22 210A")
-                    delay(30)
-                    val rpmResp = bluetoothManager.sendRawCommand("22 210C")
-                    delay(30)
-                    val gearResp = bluetoothManager.sendRawCommand("22 2112")
-
-                    val temp = parseTempResponse(tempResp)
-                    val pressure = parsePressureResponse(press1Resp)
-                    val degradation = parseDegradationResponse(degradResp)
-                    val rpm = parseRPMResponse(rpmResp)
-                    val gear = parseGearResponse(gearResp)
-
-                    // Сохраняем в лог (addEntry с 2 параметрами)
-                    val data = JatcoCVTData(
-                        oilTemperature = temp,
-                        primaryPressure = pressure,
-                        secondaryPressure = 0f,
-                        oilDegradation = degradation,
-                        engineRPM = rpm
-                    )
-                    dataLogger.addEntry(data)
-
-                    if (temp > 0) {
+                    // Запрос к TCM (0x7E2 -> 0x7E9)
+                    val tcmData = bluetoothManager.sendRawCommand("01 00")
+                    delay(50)
+                    
+                    // Температура охлаждающей жидкости (стандартный PID)
+                    val tempResp = bluetoothManager.sendRawCommand("01 05")
+                    delay(50)
+                    
+                    // Обороты двигателя
+                    val rpmResp = bluetoothManager.sendRawCommand("01 0C")
+                    delay(50)
+                    
+                    // Скорость
+                    val speedResp = bluetoothManager.sendRawCommand("01 0D")
+                    delay(50)
+                    
+                    // Дроссельная заслонка
+                    val throttleResp = bluetoothManager.sendRawCommand("01 11")
+                    
+                    val temp = parseTemp(tempResp)
+                    val rpm = parseRPM(rpmResp)
+                    val speed = parseSpeed(speedResp)
+                    val throttle = parseThrottle(throttleResp)
+                    
+                    if (temp > 0 || rpm > 0) {
+                        val data = JatcoCVTData(
+                            oilTemperature = temp,
+                            engineRPM = rpm,
+                            vehicleSpeed = speed,
+                            throttlePosition = throttle
+                        )
+                        dataLogger.addEntry(data)
+                        
                         runOnUiThread {
                             try {
                                 val (status, color, desc) = getTempStatus(temp)
                                 tvCvtTemp.text = String.format("%.1f\u00b0C", temp)
                                 tvTempStatus.text = "$status - $desc"
                                 tvTempStatus.setTextColor(color)
-                                tvPrimaryPressure.text = String.format("%.2f MPa", pressure)
-                                tvDegradation.text = "$degradation%"
                                 tvEngineRpm.text = "$rpm об/мин"
-                                tvGearPosition.text = gear
+                                tvGearRatio.text = String.format("%.0f км/ч", speed)
+                                tvPrimaryPressure.text = String.format("%.1f%%", throttle)
                                 graphView.addTemperatureData(temp)
-                                graphView.addPressureData(pressure)
-                                if (temp >= 106) {
-                                    Toast.makeText(this@MainActivity, "ПЕРЕГРЕВ ВАРИАТОРА!", Toast.LENGTH_LONG).show()
-                                }
                             } catch (e: Exception) {}
                         }
                     }
@@ -395,56 +405,53 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun parseTempResponse(response: String): Float {
+    // OBD2 парсеры
+    private fun parseTemp(response: String): Float {
         try {
-            val parts = response.split(" ")
-            if (parts.size >= 5) {
-                val raw = parts[4].toInt(16)
-                return (raw * 0.75f) - 40f
-            }
-        } catch (e: Exception) {}
-        return 0f
-    }
-
-    private fun parsePressureResponse(response: String): Float {
-        try {
-            val parts = response.split(" ")
-            if (parts.size >= 6) {
-                val raw = ((parts[4].toInt(16) shl 8) or parts[5].toInt(16))
-                return raw * 0.01f
-            }
-        } catch (e: Exception) {}
-        return 0f
-    }
-
-    private fun parseDegradationResponse(response: String): Int {
-        try {
-            val parts = response.split(" ")
-            if (parts.size >= 5) return parts[4].toInt(16)
-        } catch (e: Exception) {}
-        return 0
-    }
-
-    private fun parseRPMResponse(response: String): Int {
-        try {
-            val parts = response.split(" ")
-            if (parts.size >= 6) {
-                return ((parts[4].toInt(16) shl 8) or parts[5].toInt(16)) / 4
-            }
-        } catch (e: Exception) {}
-        return 0
-    }
-
-    private fun parseGearResponse(response: String): String {
-        try {
-            val parts = response.split(" ")
-            if (parts.size >= 5) {
-                return when (parts[4].toInt(16)) {
-                    0 -> "P"; 1 -> "R"; 2 -> "N"; 3 -> "D"; 4 -> "M"; 5 -> "S"; else -> "?"
+            for (line in response.split("\r", "\n", ">")) {
+                val parts = line.trim().split(" ")
+                if (parts.size >= 5 && parts[2] == "41" && parts[3] == "05") {
+                    return parts[4].toInt(16) - 40f
                 }
             }
         } catch (e: Exception) {}
-        return "-"
+        return 0f
+    }
+
+    private fun parseRPM(response: String): Int {
+        try {
+            for (line in response.split("\r", "\n", ">")) {
+                val parts = line.trim().split(" ")
+                if (parts.size >= 6 && parts[2] == "41" && parts[3] == "0C") {
+                    return ((parts[4].toInt(16) * 256) + parts[5].toInt(16)) / 4
+                }
+            }
+        } catch (e: Exception) {}
+        return 0
+    }
+
+    private fun parseSpeed(response: String): Float {
+        try {
+            for (line in response.split("\r", "\n", ">")) {
+                val parts = line.trim().split(" ")
+                if (parts.size >= 5 && parts[2] == "41" && parts[3] == "0D") {
+                    return parts[4].toInt(16).toFloat()
+                }
+            }
+        } catch (e: Exception) {}
+        return 0f
+    }
+
+    private fun parseThrottle(response: String): Float {
+        try {
+            for (line in response.split("\r", "\n", ">")) {
+                val parts = line.trim().split(" ")
+                if (parts.size >= 5 && parts[2] == "41" && parts[3] == "11") {
+                    return parts[4].toInt(16) * 100f / 255f
+                }
+            }
+        } catch (e: Exception) {}
+        return 0f
     }
 
     private fun stopDataCollection() { dataCollectionJob?.cancel() }
@@ -481,7 +488,13 @@ class MainActivity : AppCompatActivity() {
     private fun exportData() {
         lifecycleScope.launch {
             val f = dataLogger.exportToCSV()
-            runOnUiThread { Toast.makeText(this@MainActivity, if (f != null) "Сохранено: ${f.name}" else "Ошибка", Toast.LENGTH_LONG).show() }
+            runOnUiThread {
+                if (f != null) {
+                    Toast.makeText(this@MainActivity, "Сохранено: ${f.absolutePath}", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "Ошибка сохранения", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -500,7 +513,7 @@ class MainActivity : AppCompatActivity() {
                 val tag = json.split("\"tag_name\":\"")[1].split("\"")[0]
                 val url = json.split("\"browser_download_url\":\"")[1].split("\"")[0]
                 runOnUiThread {
-                    if (tag != "v1.0.15") {
+                    if (tag != "v1.0.17") {
                         AlertDialog.Builder(this@MainActivity)
                             .setTitle("Обновление $tag").setMessage("Скачать?")
                             .setPositiveButton("Да") { _, _ -> downloadAndInstall(url) }
