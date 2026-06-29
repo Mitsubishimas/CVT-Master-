@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -171,10 +172,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST) {
-            if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                checkBluetoothEnabled()
-            }
+        if (requestCode == PERMISSION_REQUEST && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+            checkBluetoothEnabled()
         }
     }
 
@@ -198,25 +197,26 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     when (state) {
                         ConnectionState.DISCONNECTED -> {
-                            tvConnectionStatus.text = getString(R.string.bt_disconnected)
+                            tvConnectionStatus.text = "Не подключено"
                             tvConnectionStatus.setTextColor(getColor(R.color.error))
-                            btnConnect.text = getString(R.string.bt_connect)
+                            btnConnect.text = "Подключить"
                             stopDataCollection()
                         }
                         ConnectionState.READY -> {
-                            tvConnectionStatus.text = getString(R.string.bt_connected)
+                            tvConnectionStatus.text = "Подключено"
                             tvConnectionStatus.setTextColor(getColor(R.color.success))
-                            btnConnect.text = getString(R.string.bt_disconnect)
+                            btnConnect.text = "Отключить"
                             startDataCollection()
                         }
                         ConnectionState.CONNECTING -> {
-                            tvConnectionStatus.text = getString(R.string.bt_connecting)
+                            tvConnectionStatus.text = "Подключение..."
                             btnConnect.text = "..."
                         }
-                        ConnectionState.SCANNING -> tvConnectionStatus.text = getString(R.string.bt_scanning)
+                        ConnectionState.SCANNING -> tvConnectionStatus.text = "Поиск..."
                         ConnectionState.ERROR -> {
-                            tvConnectionStatus.text = getString(R.string.bt_error)
+                            tvConnectionStatus.text = "Ошибка"
                             tvConnectionStatus.setTextColor(getColor(R.color.error))
+                            btnConnect.text = "Подключить"
                         }
                         else -> {}
                     }
@@ -241,11 +241,25 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val devices = bluetoothManager.getPairedDevices()
-        if (devices.isNotEmpty()) {
+        if (devices.isEmpty()) {
+            Toast.makeText(this, "Нет сопряженных устройств. Сопрягите ELM327 в настройках Bluetooth", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (devices.size == 1) {
+            // Одно устройство - подключаемся сразу
             Toast.makeText(this, "Подключение к " + devices[0].name + "...", Toast.LENGTH_SHORT).show()
             bluetoothManager.connectToDevice(devices[0].address)
         } else {
-            Toast.makeText(this, "Нет сопряженных устройств. Сопрягите ELM327 в настройках Bluetooth", Toast.LENGTH_LONG).show()
+            // Несколько устройств - показываем диалог выбора
+            val names = devices.map { it.name + "\n" + it.address }.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("Выберите ELM327")
+                .setItems(names) { _, which ->
+                    Toast.makeText(this, "Подключение к " + devices[which].name + "...", Toast.LENGTH_SHORT).show()
+                    bluetoothManager.connectToDevice(devices[which].address)
+                }
+                .setNegativeButton("Отмена", null)
+                .show()
         }
     }
 
@@ -294,7 +308,7 @@ class MainActivity : AppCompatActivity() {
                     if (c.isNotEmpty()) {
                         val info = c.mapNotNull { MitsubishiDTC.getDTCInfo(it) }
                         if (info.isNotEmpty()) {
-                            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                            AlertDialog.Builder(this@MainActivity)
                                 .setTitle("Ошибки (" + info.size + ")")
                                 .setMessage(info.joinToString("\n\n") { it.code + ": " + it.description })
                                 .setPositiveButton("OK", null).show()
@@ -332,9 +346,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 val tag = json.split("\"tag_name\":\"")[1].split("\"")[0]
                 runOnUiThread {
-                    if (tag != "v1.0.6") {
+                    if (tag != "v1.0.7") {
                         val url = json.split("\"browser_download_url\":\"")[1].split("\"")[0]
-                        androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                        AlertDialog.Builder(this@MainActivity)
                             .setTitle("Обновление " + tag).setMessage("Скачать?")
                             .setPositiveButton("Да") { _, _ -> downloadUpdate(url) }
                             .setNegativeButton("Нет", null).show()
