@@ -54,24 +54,33 @@ class MainActivity : AppCompatActivity() {
     private fun addLog(msg: String) {
         val line = sdf.format(Date()) + " " + msg
         logLines.add(line)
-        try {
-            if (logFile != null) {
-                FileWriter(logFile, true).use { it.write(line + "\n") }
-            }
-        } catch (e: Exception) {}
-        runOnUiThread {
-            try { tvLog.text = logLines.takeLast(50).joinToString("\n") } catch (e: Exception) {}
-        }
+        try { if (logFile != null) FileWriter(logFile, true).use { it.write(line + "\n") } } catch (e: Exception) {}
+        runOnUiThread { try { tvLog.text = logLines.takeLast(50).joinToString("\n") } catch (e: Exception) {} }
+    }
+
+    private fun getLogsDir(): File {
+        val dir = File(filesDir, "logs")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    private fun getUpdateFile(): File {
+        val dir = File(filesDir, "updates")
+        if (!dir.exists()) dir.mkdirs()
+        // Удаляем старые update файлы
+        dir.listFiles()?.forEach { if (it.name.startsWith("update_") && it.lastModified() < System.currentTimeMillis() - 86400000) it.delete() }
+        return File(dir, "update_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date()) + ".apk")
     }
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         setContentView(R.layout.activity_main)
-        
-        logFile = File(getExternalFilesDir(null), "cvt_master_log_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date()) + ".txt")
-        addLog("=== CVT Master START ===")
+
+        logFile = File(getLogsDir(), "cvt_master_log_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date()) + ".txt")
+        addLog("=== CVT Master v1.0.24 ===")
         addLog("Device: " + Build.MODEL + " | Android: " + Build.VERSION.RELEASE)
-        addLog("Log file: " + logFile!!.absolutePath)
+        addLog("Logs dir: " + getLogsDir().absolutePath)
+        addLog("Updates dir: " + File(filesDir, "updates").absolutePath)
 
         tvStatus = findViewById(R.id.tv_connection_status)
         btnConn = findViewById(R.id.btn_connect); btnMenu = findViewById(R.id.btn_menu)
@@ -85,12 +94,12 @@ class MainActivity : AppCompatActivity() {
         tvLog = TextView(this).apply { textSize = 10f; setTextColor(0xFF888888.toInt()); setPadding(4, 4, 4, 4); maxLines = 50 }
         graph = CVTGraphView(this)
         bm = BluetoothManager(this); logger = DataLogger(this)
-        
+
         addLog("Views initialized")
 
         btnConn.setOnClickListener {
-            if (bm.connectionState.value == ConnectionState.READY) { addLog("Disconnect requested"); stop(); bm.disconnect() }
-            else { addLog("Connect requested"); connect() }
+            if (bm.connectionState.value == ConnectionState.READY) { addLog("Disconnect"); stop(); bm.disconnect() }
+            else { addLog("Connect"); connect() }
         }
         btnMenu.setOnClickListener { menu() }
         setupNav()
@@ -101,21 +110,50 @@ class MainActivity : AppCompatActivity() {
 
     private fun menu() {
         addLog("Menu opened")
-        val items = arrayOf("Check updates", "Export + Share logs", "Status", "Reset oil", "Allow install", if (auto) "Mode: Auto" else "Mode: ATSP6")
+        val items = arrayOf("Check updates", "Share logs", "Status", "Reset oil", "Allow install", if (auto) "Mode: Auto" else "Mode: ATSP6")
         AlertDialog.Builder(this).setTitle("Menu").setItems(items) { _, w ->
             when (w) {
                 0 -> { addLog("Menu: Check updates"); checkUpd() }
-                1 -> { addLog("Menu: Export logs"); export() }
+                1 -> { addLog("Menu: Share logs"); shareLogs() }
                 2 -> { addLog("Menu: Status"); info() }
                 3 -> { addLog("Menu: Reset oil"); resetOil() }
                 4 -> { addLog("Menu: Allow install"); instPerm() }
-                5 -> { auto = !auto; addLog("Menu: Protocol = " + (if (auto) "Auto" else "ATSP6")); Toast.makeText(this, "Reconnect to apply", Toast.LENGTH_SHORT).show() }
+                5 -> { auto = !auto; addLog("Protocol: " + (if (auto) "Auto" else "ATSP6")); Toast.makeText(this, "Reconnect to apply", Toast.LENGTH_SHORT).show() }
             }
         }.show()
     }
 
     private fun info() {
         AlertDialog.Builder(this).setTitle("Status").setMessage(tvInfo.text).setPositiveButton("OK", null).show()
+    }
+
+    private fun shareLogs() {
+        try {
+            // Закрываем текущий лог перед отправкой
+            addLog("=== Preparing logs for sharing ===")
+            
+            // Собираем все логи из папки
+            val logFiles = getLogsDir().listFiles()?.filter { it.name.endsWith(".txt") || it.name.endsWith(".csv") }?.sortedByDescending { it.lastModified() }?.take(5)
+            
+            if (logFiles.isNullOrEmpty()) {
+                Toast.makeText(this, "No log files", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            val uris = logFiles.map { FileProvider.getUriForFile(this, packageName + ".fileprovider", it) }
+            
+            val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "text/plain"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                putExtra(Intent.EXTRA_SUBJECT, "CVT Master Logs " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date()))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share logs via"))
+            addLog("Logs shared: " + logFiles.size + " files")
+        } catch (e: Exception) {
+            addLog("Share error: " + e.message)
+            Toast.makeText(this, "Error: " + e.message, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun setupNav() {
@@ -151,7 +189,7 @@ class MainActivity : AppCompatActivity() {
                     l.addView(rg)
                     l.addView(android.view.View(this).apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 24) })
                     l.addView(Button(this).apply { text = "Check updates"; setOnClickListener { checkUpd() } })
-                    l.addView(Button(this).apply { text = "Export + Share logs"; setOnClickListener { export() } })
+                    l.addView(Button(this).apply { text = "Share logs"; setOnClickListener { shareLogs() } })
                     l.addView(Button(this).apply { text = "Reset oil"; setOnClickListener { resetOil() } })
                     l.addView(Button(this).apply { text = "Status"; setOnClickListener { info() } })
                     l.addView(Button(this).apply { text = "Allow install"; setOnClickListener { instPerm() } })
@@ -159,7 +197,6 @@ class MainActivity : AppCompatActivity() {
                         if (bm.connectionState.value == ConnectionState.READY) { addLog("Reconnect ECU"); initELM() }
                         else Toast.makeText(this@MainActivity, "Connect first", Toast.LENGTH_SHORT).show()
                     }})
-                    // Log view
                     l.addView(TextView(this).apply { text = "--- LOG ---"; setTextColor(0xFF888888.toInt()); textSize = 12f; setPadding(0, 24, 0, 4) })
                     l.addView(ScrollView(this).apply { addView(tvLog); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 300) })
                     cont.addView(l)
@@ -183,19 +220,16 @@ class MainActivity : AppCompatActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED) p.add(Manifest.permission.BLUETOOTH)
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) p.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        if (p.isNotEmpty()) { addLog("Requesting permissions: " + p.joinToString()); ActivityCompat.requestPermissions(this, p.toTypedArray(), PERM) }
-        else addLog("All permissions granted")
+        if (p.isNotEmpty()) { addLog("Requesting: " + p.joinToString()); ActivityCompat.requestPermissions(this, p.toTypedArray(), PERM) }
+        else addLog("All permissions OK")
     }
 
     override fun onRequestPermissionsResult(c: Int, perms: Array<out String>, g: IntArray) {
         super.onRequestPermissionsResult(c, perms, g)
-        if (c == PERM) {
-            addLog("Permissions result: " + g.joinToString())
-            if (g.all { it == PackageManager.PERMISSION_GRANTED }) {
-                val bt = BluetoothAdapter.getDefaultAdapter()
-                if (bt != null && !bt.isEnabled) { addLog("BT off, requesting enable"); startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQ_BT) }
-                else addLog("BT already on")
-            }
+        if (c == PERM && g.all { it == PackageManager.PERMISSION_GRANTED }) {
+            addLog("Permissions granted")
+            val bt = BluetoothAdapter.getDefaultAdapter()
+            if (bt != null && !bt.isEnabled) { addLog("BT off, requesting"); startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQ_BT) }
         }
     }
 
@@ -208,12 +242,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onActivityResult(c: Int, r: Int, d: Intent?) {
         super.onActivityResult(c, r, d)
-        if (c == REQ_BT) addLog("BT enable result: " + (if (r == RESULT_OK) "ON" else "OFF"))
-        if (c == REQ_INSTALL) addLog("Install permission result: " + (if (packageManager.canRequestPackageInstalls()) "Granted" else "Denied"))
+        if (c == REQ_BT) addLog("BT result: " + (if (r == RESULT_OK) "ON" else "OFF"))
+        if (c == REQ_INSTALL) addLog("Install result: " + (if (packageManager.canRequestPackageInstalls()) "OK" else "No"))
     }
 
     private fun observe() {
-        addLog("Starting connection observer")
+        addLog("Observer started")
         lifecycleScope.launch {
             bm.connectionState.collect { s -> runOnUiThread {
                 when (s) {
@@ -221,7 +255,7 @@ class MainActivity : AppCompatActivity() {
                     ConnectionState.READY -> { addLog("State: READY"); tvStatus.text = "On"; tvStatus.setTextColor(getColor(R.color.success)); btnConn.text = "Disconnect"; initELM() }
                     ConnectionState.CONNECTING -> { addLog("State: CONNECTING"); tvStatus.text = "..."; btnConn.text = "..." }
                     ConnectionState.ERROR -> { addLog("State: ERROR"); tvStatus.text = "Err"; tvStatus.setTextColor(getColor(R.color.error)); btnConn.text = "Connect" }
-                    else -> { addLog("State: " + s.name) }
+                    else -> {}
                 }
             }}
         }
@@ -232,100 +266,49 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 runOnUiThread { tvStatus.text = "Init..." }
-                
-                addLog("Sending: ATZ")
-                bm.sendRawCommand("ATZ"); delay(2000)
-                addLog("Sending: ATE0")
-                bm.sendRawCommand("ATE0"); delay(200)
-                addLog("Sending: ATL0")
-                bm.sendRawCommand("ATL0"); delay(100)
-                addLog("Sending: ATS1")
-                bm.sendRawCommand("ATS1"); delay(100)
-                addLog("Sending: ATH1")
-                bm.sendRawCommand("ATH1"); delay(200)
-                
-                if (auto) { addLog("Sending: ATSP0 (Auto)"); bm.sendRawCommand("ATSP0"); delay(2000) }
-                else { addLog("Sending: ATSP6 (Mitsubishi)"); bm.sendRawCommand("ATSP6"); delay(500) }
-                
-                addLog("Sending: ATI")
-                val ver = bm.sendRawCommand("ATI"); delay(200)
-                addLog("ELM Version: " + ver)
-                
-                addLog("Sending: ATSH " + TCM_REQ)
-                bm.sendRawCommand("ATSH $TCM_REQ"); delay(100)
-                addLog("Sending: ATCRA " + TCM_RES)
-                bm.sendRawCommand("ATCRA $TCM_RES"); delay(100)
-                addLog("Sending: ATCF " + TCM_RES)
-                bm.sendRawCommand("ATCF $TCM_RES"); delay(100)
-                
-                addLog("Sending: 01 00 (Test)")
-                val test = bm.sendRawCommand("01 00"); delay(300)
-                addLog("Test response: " + test)
-                
+                addLog("ATZ"); bm.sendRawCommand("ATZ"); delay(2000)
+                addLog("ATE0"); bm.sendRawCommand("ATE0"); delay(200)
+                addLog("ATL0"); bm.sendRawCommand("ATL0"); delay(100)
+                addLog("ATS1"); bm.sendRawCommand("ATS1"); delay(100)
+                addLog("ATH1"); bm.sendRawCommand("ATH1"); delay(200)
+                if (auto) { addLog("ATSP0"); bm.sendRawCommand("ATSP0"); delay(2000) } else { addLog("ATSP6"); bm.sendRawCommand("ATSP6"); delay(500) }
+                val ver = bm.sendRawCommand("ATI"); delay(200); addLog("ELM: " + ver)
+                addLog("ATSH " + TCM_REQ); bm.sendRawCommand("ATSH $TCM_REQ"); delay(100)
+                addLog("ATCRA " + TCM_RES); bm.sendRawCommand("ATCRA $TCM_RES"); delay(100)
+                addLog("ATCF " + TCM_RES); bm.sendRawCommand("ATCF $TCM_RES"); delay(100)
+                val test = bm.sendRawCommand("01 00"); delay(300); addLog("Test: " + test)
                 val ok = test.contains("41")
-                runOnUiThread {
-                    tvStatus.text = if (ok) "OK" else "No ECU"
-                    tvInfo.text = "ELM: " + ver + " | TCM: 0x" + TCM_REQ + "->0x" + TCM_RES + " | " + (if (ok) "ECU OK" else "No response")
-                }
-                addLog("ECU test: " + (if (ok) "OK" else "FAIL"))
-                
+                runOnUiThread { tvStatus.text = if (ok) "OK" else "No ECU"; tvInfo.text = "ELM: " + ver + " | " + (if (ok) "ECU OK" else "No response") }
+                addLog("ECU: " + (if (ok) "OK" else "FAIL"))
                 if (ok) start()
-            } catch (e: Exception) { addLog("INIT ERROR: " + e.message); runOnUiThread { tvInfo.text = "Error: " + e.message } }
+            } catch (e: Exception) { addLog("INIT ERROR: " + e.message) }
         }
     }
 
     private fun connect() {
         addLog("=== CONNECT ===")
         val bt = BluetoothAdapter.getDefaultAdapter()
-        if (bt == null) { addLog("BT not supported"); Toast.makeText(this, "No BT", Toast.LENGTH_LONG).show(); return }
-        if (!bt.isEnabled) { addLog("BT disabled, requesting enable"); startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQ_BT); return }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            addLog("No BT permission"); Toast.makeText(this, "No perm", Toast.LENGTH_SHORT).show(); reqPerm(); return
-        }
+        if (bt == null) { addLog("No BT"); return }
+        if (!bt.isEnabled) { addLog("BT off"); startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQ_BT); return }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) { addLog("No perm"); reqPerm(); return }
         val d = bm.getPairedDevices()
-        addLog("Paired devices: " + d.size)
-        if (d.isEmpty()) { addLog("No paired devices"); Toast.makeText(this, "No devices", Toast.LENGTH_LONG).show(); return }
-        if (d.size == 1) {
-            addLog("Connecting to: " + d[0].name + " (" + d[0].address + ")")
-            bm.connectToDevice(d[0].address)
-        } else {
-            AlertDialog.Builder(this).setTitle("Select").setItems(d.map { it.name }.toTypedArray()) { _, w ->
-                addLog("Selected: " + d[w].name + " (" + d[w].address + ")")
-                bm.connectToDevice(d[w].address)
-            }.setNegativeButton("Cancel", null).show()
-        }
+        addLog("Devices: " + d.size)
+        if (d.isEmpty()) { addLog("No devices"); return }
+        if (d.size == 1) { addLog("Connect: " + d[0].name); bm.connectToDevice(d[0].address) }
+        else AlertDialog.Builder(this).setTitle("Select").setItems(d.map { it.name }.toTypedArray()) { _, w -> addLog("Select: " + d[w].name); bm.connectToDevice(d[w].address) }.setNegativeButton("Cancel", null).show()
     }
 
     private fun start() {
-        addLog("=== START DATA COLLECTION ===")
+        addLog("=== START DATA ===")
         job?.cancel()
         job = lifecycleScope.launch {
             while (isActive) {
                 try {
-                    addLog("--- Poll cycle ---")
-                    
-                    addLog("Sending: 01 05 (Temp)")
-                    val r05 = bm.sendRawCommand("01 05"); delay(80)
-                    addLog("01 05 response: " + r05)
-                    val t = parseT(r05)
-                    
-                    addLog("Sending: 01 0C (RPM)")
-                    val r0C = bm.sendRawCommand("01 0C"); delay(80)
-                    addLog("01 0C response: " + r0C)
-                    val r = parseR(r0C)
-                    
-                    addLog("Sending: 01 0D (Speed)")
-                    val r0D = bm.sendRawCommand("01 0D"); delay(80)
-                    addLog("01 0D response: " + r0D)
-                    val s = parseS(r0D)
-                    
-                    addLog("Sending: 01 11 (Throttle)")
-                    val r11 = bm.sendRawCommand("01 11")
-                    addLog("01 11 response: " + r11)
-                    val th = parseTh(r11)
-                    
-                    addLog("Parsed: T=" + t + " R=" + r + " S=" + s + " TH=" + th)
-                    
+                    val r05 = bm.sendRawCommand("01 05"); delay(80); val t = parseT(r05)
+                    val r0C = bm.sendRawCommand("01 0C"); delay(80); val r = parseR(r0C)
+                    val r0D = bm.sendRawCommand("01 0D"); delay(80); val s = parseS(r0D)
+                    val r11 = bm.sendRawCommand("01 11"); val th = parseTh(r11)
+                    addLog("Poll: T=" + t + " R=" + r + " S=" + s + " TH=" + th)
                     if (t > 0 || r > 0) {
                         logger.addEntry(JatcoCVTData(oilTemperature = t, engineRPM = r, vehicleSpeed = s, throttlePosition = th))
                         runOnUiThread {
@@ -337,13 +320,13 @@ class MainActivity : AppCompatActivity() {
                             } catch (e: Exception) {}
                         }
                     }
-                } catch (e: CancellationException) { throw e } catch (e: Exception) { addLog("Poll error: " + e.message) }
+                } catch (e: CancellationException) { throw e } catch (e: Exception) { addLog("Poll err: " + e.message) }
                 delay(1000)
             }
         }
     }
 
-    private fun stop() { addLog("=== STOP DATA COLLECTION ==="); job?.cancel() }
+    private fun stop() { addLog("=== STOP ==="); job?.cancel() }
 
     private fun parseT(r: String): Float { for (l in r.split("\r", "\n", ">")) { val p = l.trim().split(" "); if (p.size >= 5 && p[2] == "41" && p[3] == "05") return p[4].toInt(16) - 40f }; return 0f }
     private fun parseR(r: String): Int { for (l in r.split("\r", "\n", ">")) { val p = l.trim().split(" "); if (p.size >= 6 && p[2] == "41" && p[3] == "0C") return ((p[4].toInt(16) * 256) + p[5].toInt(16)) / 4 }; return 0 }
@@ -354,59 +337,23 @@ class MainActivity : AppCompatActivity() {
         addLog("=== SCAN DTC ===")
         lifecycleScope.launch {
             try {
-                addLog("Sending: 03")
-                val r = bm.sendRawCommand("03")
-                addLog("03 response: " + r)
+                val r = bm.sendRawCommand("03"); addLog("03: " + r)
                 runOnUiThread {
                     val c = parseDTC(r)
-                    addLog("DTC parsed: " + c.size + " codes")
                     if (c.isNotEmpty()) {
                         val info = c.mapNotNull { MitsubishiDTC.getDTCInfo(it) }
                         if (info.isNotEmpty()) AlertDialog.Builder(this@MainActivity).setTitle("DTC (" + info.size + ")").setMessage(info.joinToString("\n\n") { it.code + ": " + it.description }).setPositiveButton("OK", null).show()
                     } else Toast.makeText(this@MainActivity, "No errors", Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) { addLog("DTC error: " + e.message) }
+            } catch (e: Exception) { addLog("DTC err: " + e.message) }
         }
     }
 
     private fun resetOil() {
         addLog("=== RESET OIL ===")
         lifecycleScope.launch {
-            try { val r = OilDegradationReset().resetJF011E(bm); addLog("Reset result: " + r.message); runOnUiThread { Toast.makeText(this@MainActivity, r.message, Toast.LENGTH_SHORT).show() } }
-            catch (e: Exception) { addLog("Reset error: " + e.message) }
-        }
-    }
-
-    private fun export() {
-        addLog("=== EXPORT LOGS ===")
-        lifecycleScope.launch {
-            try {
-                val f = logger.exportToCSV()
-                if (f != null) {
-                    addLog("CSV saved: " + f.absolutePath)
-                    
-                    // Also save debug log
-                    if (logFile != null && logFile!!.exists()) {
-                        addLog("Debug log: " + logFile!!.absolutePath)
-                        
-                        // Share via Intent
-                        val uri = FileProvider.getUriForFile(this@MainActivity, packageName + ".fileprovider", logFile!!)
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            putExtra(Intent.EXTRA_SUBJECT, "CVT Master Debug Log")
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        runOnUiThread {
-                            AlertDialog.Builder(this@MainActivity)
-                                .setTitle("Export done")
-                                .setMessage("CSV: " + f.name + "\nLog: " + logFile!!.name + "\n\nShare via messenger?")
-                                .setPositiveButton("Share") { _, _ -> startActivity(Intent.createChooser(shareIntent, "Share log")) }
-                                .setNegativeButton("Close", null).show()
-                        }
-                    }
-                } else addLog("CSV export failed")
-            } catch (e: Exception) { addLog("Export error: " + e.message) }
+            try { val r = OilDegradationReset().resetJF011E(bm); addLog("Reset: " + r.message); runOnUiThread { Toast.makeText(this@MainActivity, r.message, Toast.LENGTH_SHORT).show() } }
+            catch (e: Exception) { addLog("Reset err: " + e.message) }
         }
     }
 
@@ -424,27 +371,28 @@ class MainActivity : AppCompatActivity() {
                 val url = json.split("\"browser_download_url\":\"")[1].split("\"")[0]
                 addLog("Latest: " + tag)
                 runOnUiThread { AlertDialog.Builder(this@MainActivity).setTitle("Update " + tag).setMessage("Download?").setPositiveButton("Yes") { _, _ -> download(url) }.setNegativeButton("No", null).show() }
-            } catch (e: Exception) { addLog("Update check error: " + e.message) }
+            } catch (e: Exception) { addLog("Update err: " + e.message) }
         }
     }
 
     private fun download(url: String) {
-        addLog("=== DOWNLOAD: " + url)
-        val p = AlertDialog.Builder(this@MainActivity).setTitle("Download...").setCancelable(false).create(); p.show()
+        addLog("=== DOWNLOAD ===")
+        val p = AlertDialog.Builder(this@MainActivity).setTitle("Downloading...").setCancelable(false).create(); p.show()
         lifecycleScope.launch {
             try {
                 val f = withContext(Dispatchers.IO) {
                     val c = URL(url).openConnection() as HttpURLConnection
                     c.setRequestProperty("User-Agent", "CVT"); c.connectTimeout = 30000; c.readTimeout = 30000; c.instanceFollowRedirects = true
-                    val file = File(getExternalFilesDir(null), "update.apk")
+                    val file = getUpdateFile()
                     c.inputStream.use { i -> FileOutputStream(file).use { o -> i.copyTo(o) } }; file
                 }
-                p.dismiss(); addLog("Downloaded: " + f.length() + " bytes")
+                p.dismiss(); addLog("Saved: " + f.name + " (" + f.length() + " bytes)")
+                val uri = FileProvider.getUriForFile(this@MainActivity, packageName + ".fileprovider", f)
                 startActivity(Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(FileProvider.getUriForFile(this@MainActivity, packageName + ".fileprovider", f), "application/vnd.android.package-archive")
+                    setDataAndType(uri, "application/vnd.android.package-archive")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 })
-            } catch (e: Exception) { p.dismiss(); addLog("Download error: " + e.message); runOnUiThread { Toast.makeText(this@MainActivity, "Error: " + e.message, Toast.LENGTH_LONG).show() } }
+            } catch (e: Exception) { p.dismiss(); addLog("Download err: " + e.message); runOnUiThread { Toast.makeText(this@MainActivity, "Error: " + e.message, Toast.LENGTH_LONG).show() } }
         }
     }
 
@@ -454,5 +402,5 @@ class MainActivity : AppCompatActivity() {
         return c
     }
 
-    override fun onDestroy() { addLog("=== DESTROY ==="); super.onDestroy(); stop(); bm.disconnect() }
+    override fun onDestroy() { addLog("=== EXIT ==="); super.onDestroy(); stop(); bm.disconnect() }
 }
