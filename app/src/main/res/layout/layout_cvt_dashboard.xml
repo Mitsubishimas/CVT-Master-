@@ -130,7 +130,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginEnd="5dp"
+            android:layout_marginEnd="4dp"
             android:layout_marginBottom="10dp"
             app:cardBackgroundColor="@color/surface"
             app:cardCornerRadius="16dp"
@@ -141,9 +141,30 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="14dp">
-                <TextView android:text="Primary Pressure" android:textColor="@color/text_secondary" android:textSize="10sp" />
-                <TextView android:id="@+id/tv_primary_pressure" android:text="--" android:textColor="@color/cvt_pressure" android:textSize="22sp" android:textStyle="bold" />
+                android:padding="12dp">
+                <TextView android:text="Primary" android:textColor="@color/text_secondary" android:textSize="9sp" />
+                <TextView android:id="@+id/tv_primary_pressure" android:text="--" android:textColor="@color/cvt_pressure" android:textSize="18sp" android:textStyle="bold" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:layout_marginBottom="10dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="@color/surface_variant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+                <TextView android:text="Secondary" android:textColor="@color/text_secondary" android:textSize="9sp" />
+                <TextView android:id="@+id/tv_secondary_pressure" android:text="--" android:textColor="@color/cvt_pressure" android:textSize="18sp" android:textStyle="bold" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -161,9 +182,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="14dp">
-                <TextView android:text="Deterioration" android:textColor="@color/text_secondary" android:textSize="10sp" />
-                <TextView android:id="@+id/tv_degradation" android:text="--" android:textColor="@color/warning" android:textSize="22sp" android:textStyle="bold" />
+                android:padding="12dp">
+                <TextView android:text="Deterior." android:textColor="@color/text_secondary" android:textSize="9sp" />
+                <TextView android:id="@+id/tv_degradation" android:text="--" android:textColor="@color/warning" android:textSize="18sp" android:textStyle="bold" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
     </LinearLayout>
