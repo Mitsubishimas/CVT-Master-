@@ -40,7 +40,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val PERM = 100; private const val REQ_BT = 101; private const val REQ_INSTALL = 102
         private const val API = "https://api.github.com/repos/Mitsubishimas/CVT-Master-/releases/latest"
-        private const val CURRENT_VERSION = "v1.0.29"
+        private const val CURRENT_VERSION = "v1.0.30"
         private const val PREFS_NAME = "cvt_master_prefs"
         private const val KEY_LAST_CHECK = "last_update_check"
         
