@@ -493,35 +493,9 @@ class MainActivity : AppCompatActivity() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) ?: -1
             if (id == downloadId) {
-                try {
-                    val dm = ctx?.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                    val uri = dm.getUriForDownloadedFile(downloadId)
-                    if (uri != null) {
-                        addLog("Install: " + uri)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            // Android 8+ - use PackageInstaller with REPLACING flag
-                            val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                                setData(uri)
-                                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                                putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                                putExtra("android.intent.extra.REPLACING", true)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            ctx?.startActivity(installIntent)
-                        } else {
-                            // Android 7 and below
-                            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(uri, "application/vnd.android.package-archive")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            ctx?.startActivity(installIntent)
-                        }
-                    }
-                } catch (e: Exception) {
-                    addLog("Install error: " + e.message)
-                }
+                val dm = ctx?.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                val uri = dm.getUriForDownloadedFile(downloadId)
+                if (uri != null) startActivity(Intent(Intent.ACTION_VIEW).apply { setDataAndType(uri, "application/vnd.android.package-archive"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK) })
             }
         }
     }
