@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/nav_dashboard" android:icon="@android:drawable/ic_menu_compass" android:title="Приборы"/>
-    <item android:id="@+id/nav_graphs" android:icon="@android:drawable/ic_menu_gallery" android:title="Графики"/>
-    <item android:id="@+id/nav_dtc" android:icon="@android:drawable/ic_menu_report_image" android:title="Ошибки"/>
-    <item android:id="@+id/nav_settings" android:icon="@android:drawable/ic_menu_manage" android:title="Настройки"/>
+    <item android:id="@+id/nav_dashboard" android:icon="@android:drawable/ic_menu_compass" android:title="Dashboard"/>
+    <item android:id="@+id/nav_graphs" android:icon="@android:drawable/ic_menu_gallery" android:title="Graphs"/>
+    <item android:id="@+id/nav_dtc" android:icon="@android:drawable/ic_menu_report_image" android:title="DTC"/>
+    <item android:id="@+id/nav_settings" android:icon="@android:drawable/ic_menu_manage" android:title="Settings"/>
 </menu>

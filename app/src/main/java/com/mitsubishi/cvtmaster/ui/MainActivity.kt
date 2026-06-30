@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvRpm: TextView; private lateinit var tvRatio: TextView; private lateinit var tvBelt: TextView
     private lateinit var tvTcc: TextView; private lateinit var tvGear: TextView; private lateinit var tvInfo: TextView
     private lateinit var tvLog: TextView
-    private lateinit var btnConn: Button; private lateinit var btnMenu: Button
+    private lateinit var btnConn: Button
     private lateinit var nav: com.google.android.material.bottomnavigation.BottomNavigationView
     private lateinit var cont: LinearLayout; private lateinit var graph: CVTGraphView
     private var job: Job? = null
@@ -102,7 +102,7 @@ class MainActivity : AppCompatActivity() {
         logFile = File(logDir, "cvt_log_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date()) + ".txt")
 
         tvStatus = findViewById(R.id.tv_connection_status)
-        btnConn = findViewById(R.id.btn_connect); btnMenu = findViewById(R.id.btn_menu)
+        btnConn = findViewById(R.id.btn_connect)
         nav = findViewById(R.id.bottom_nav); cont = findViewById(R.id.content_container)
         tvTemp = findViewById(R.id.tv_cvt_temp); tvDeg = findViewById(R.id.tv_degradation)
         tvPr1 = findViewById(R.id.tv_primary_pressure); tvPr2 = findViewById(R.id.tv_secondary_pressure)
@@ -118,7 +118,7 @@ class MainActivity : AppCompatActivity() {
             if (bm.connectionState.value == ConnectionState.READY) { stop(); bm.disconnect() }
             else connect()
         }
-        btnMenu.setOnClickListener { menu() }
+        // Menu moved to Settings tab
         setupNav()
         reqPerm()
         observe()
@@ -132,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         if (System.currentTimeMillis() - lastCheck > 7 * 24 * 60 * 60 * 1000L) checkUpdate(false)
     }
 
-    private fun menu() {
+    private fun settingsMenu() {
         val items = arrayOf("Check updates","Copy log","Reset oil (deterioration)","Allow install")
         AlertDialog.Builder(this).setTitle("Menu").setItems(items) { _, w ->
             when (w) { 0->checkUpdate(true); 1->copyLog(); 2->lifecycleScope.launch { resetDeterioration() }; 3->instPerm() }
@@ -170,6 +170,7 @@ class MainActivity : AppCompatActivity() {
                     cont.addView(l)
                 }
                 R.id.nav_settings -> {
+                    settingsMenu()
                     val scroll = ScrollView(this)
                     val l = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16, 16, 16, 16) }
                     l.addView(TextView(this).apply { text = "CVT Model: " + cvtModel; setTextColor(getColor(R.color.white)); textSize = 16f; setPadding(0, 0, 0, 8) })
